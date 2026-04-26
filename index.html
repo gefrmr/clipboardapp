@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Mijn Klembord Bewaarder - per zin</title>
+    <title>Mijn Klembord - timestamps verwijderd</title>
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -91,16 +91,26 @@
     <button id="saveManualBtn">💾 Bewaar deze tekst</button>
     
     <hr>
-    <h2>📄 Bewaarde teksten (elke zin op nieuwe regel)</h2>
+    <h2>📄 Bewaarde teksten (zonder timestamps, elke zin aparte regel)</h2>
     <div id="listContainer">Laden...</div>
 
     <script>
-        // ==================== SUPABASE CONFIG (VUL ZELF IN) ====================
-        const SUPABASE_URL = 'https://dlplfravchetdqmfgqdl.supabase.co';    // <-- Vervang
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRscGxmcmF2Y2hldGRxbWZncWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODk2MjcsImV4cCI6MjA5Mjc2NTYyN30.AYREEI81OfBY2IREM6bM1T152Y30Im8s5PXTqCflBws';                // <-- Vervang
-        // ====================================================================
+        // ==================== SUPABASE CONFIG ====================
+        const SUPABASE_URL = 'https://dlplfravchetdqmfgqdl.supabase.co';    // Vervang
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRscGxmcmF2Y2hldGRxbWZncWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODk2MjcsImV4cCI6MjA5Mjc2NTYyN30.AYREEI81OfBY2IREM6bM1T152Y30Im8s5PXTqCflBws';                // Vervang
+        // ========================================================
 
-        // Helper: tekst opslaan
+        // Verwijder timestamps zoals [00:01] of [01:23:45] uit de tekst (alleen voor weergave)
+        function removeTimestamps(text) {
+            // Match [cijfers:cijfers] of [cijfers:cijfers:cijfers]
+            const timestampRegex = /\[\d{2}:\d{2}(?::\d{2})?\]/g;
+            let cleaned = text.replace(timestampRegex, '');
+            // Optioneel:多余 spaties opschonen
+            cleaned = cleaned.replace(/\s+/g, ' ').trim();
+            return cleaned;
+        }
+
+        // Opslaan naar Supabase
         async function saveText(content) {
             if (!content.trim()) return alert('Geen tekst om op te slaan.');
             const response = await fetch(`${SUPABASE_URL}/rest/v1/texts`, {
@@ -122,7 +132,7 @@
             }
         }
 
-        // Helper: tekst verwijderen op basis van ID
+        // Verwijder item uit database (blijft origineel, timestamps blijven bewaard)
         async function deleteText(id) {
             if (!confirm('Weet je zeker dat je deze tekst wilt verwijderen?')) return;
             const response = await fetch(`${SUPABASE_URL}/rest/v1/texts?id=eq.${id}`, {
@@ -140,17 +150,14 @@
             }
         }
 
-        // Zin-splitsfunctie: houdt leestekens behouden, elke zin op nieuwe regel
+        // Zin-splitsfunctie (werkt op een string zonder timestamps)
         function splitIntoSentences(text) {
-            // Splits op . ! ? gevolgd door spatie of einde string (of newline)
-            // We gebruiken een lookahead om de scheidingstekens te behouden
             const sentences = text.match(/[^.!?]+[.!?]+|.+$/g);
             if (!sentences) return [text];
-            // Trim elke zin en verwijder lege entries
             return sentences.map(s => s.trim()).filter(s => s.length > 0);
         }
 
-        // Huidige lijst laden en weergeven (met zinnen per item)
+        // Lijst laden en weergeven met verwijderde timestamps en zinsplitsing
         async function laadLijst() {
             const container = document.getElementById('listContainer');
             container.innerHTML = 'Laden...';
@@ -168,8 +175,9 @@
                         return;
                     }
                     container.innerHTML = data.map(item => {
-                        // Zin voor zin opbreken
-                        const sentences = splitIntoSentences(item.content);
+                        // Haal timestamps ALLEEN uit de weergave, database blijft origineel
+                        const cleanedContent = removeTimestamps(item.content);
+                        const sentences = splitIntoSentences(cleanedContent);
                         const sentencesHtml = sentences.map(sentence => 
                             `<span class="sentence-line">• ${escapeHtml(sentence)}</span>`
                         ).join('');
@@ -178,14 +186,14 @@
                             <div class="item" data-id="${item.id}">
                                 <button class="delete-btn" data-id="${item.id}">❌</button>
                                 <div class="sentence-container">
-                                    ${sentencesHtml}
+                                    ${sentencesHtml || '<span class="sentence-line">[lege tekst na verwijderen timestamps]</span>'}
                                 </div>
                                 <div class="small">🗓️ ${new Date(item.created_at).toLocaleString()}</div>
                             </div>
                         `;
                     }).join('');
                     
-                    // Koppel de delete-knoppen na het renderen
+                    // Delete-knoppen activeren
                     document.querySelectorAll('.delete-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
@@ -201,7 +209,7 @@
             }
         }
 
-        // Kleine XSS-bescherming
+        // XSS-bescherming
         function escapeHtml(str) {
             return str.replace(/[&<>]/g, function(m) {
                 if (m === '&') return '&amp;';
@@ -211,7 +219,7 @@
             });
         }
 
-        // Klembord plakken (alleen via gebruikersactie)
+        // Klembord plakken
         document.getElementById('pasteBtn').onclick = async () => {
             try {
                 const text = await navigator.clipboard.readText();
@@ -225,14 +233,14 @@
             }
         };
 
-        // Handmatige tekst opslaan
+        // Handmatig opslaan
         document.getElementById('saveManualBtn').onclick = () => {
             const text = document.getElementById('manualText').value;
             saveText(text);
             document.getElementById('manualText').value = '';
         };
 
-        // Als browser Clipboard API niet ondersteunt (bv. sommige mobiele browsers)
+        // Fallback voor browsers zonder clipboard API
         if (!navigator.clipboard || !navigator.clipboard.readText) {
             document.getElementById('pasteBtn').style.display = 'none';
             const warning = document.createElement('p');
@@ -241,7 +249,7 @@
             document.body.insertBefore(warning, document.getElementById('manualText'));
         }
 
-        // Start lijst laden
+        // Start laden
         laadLijst();
     </script>
 </body>
