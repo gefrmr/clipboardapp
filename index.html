@@ -3,12 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Mijn Klembord Bewaarder</title>
+    <title>Mijn Klembord Bewaarder - per zin</title>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
-        button, textarea { width: 100%; padding: 0.75rem; margin: 0.5rem 0; font-size: 1rem; }
-        .item { background: #f3f4f6; padding: 0.75rem; margin: 0.5rem 0; border-radius: 8px; word-wrap: break-word; }
-        .small { font-size: 0.8rem; color: #6b7280; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 700px;
+            margin: 2rem auto;
+            padding: 1rem;
+            background: #f9fafb;
+        }
+        h1, h2 { color: #111827; }
+        button, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            font-size: 1rem;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .item {
+            background: white;
+            padding: 0.75rem;
+            margin: 0.75rem 0;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #2563eb;
+            word-wrap: break-word;
+            position: relative;
+        }
+        .sentence-line {
+            display: block;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+        .small {
+            font-size: 0.7rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.75rem;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #ef4444;
+            font-weight: bold;
+            padding: 0 4px;
+            width: auto;
+            border-radius: 20px;
+        }
+        .delete-btn:hover {
+            background: #fee2e2;
+            transform: scale(1.1);
+        }
+        hr {
+            margin: 1.5rem 0;
+        }
+        #listContainer {
+            margin-top: 1rem;
+        }
+        @media (max-width: 500px) {
+            body { margin: 1rem; }
+            .delete-btn { top: 0.25rem; right: 0.5rem; }
+        }
     </style>
 </head>
 <body>
@@ -19,15 +91,16 @@
     <button id="saveManualBtn">💾 Bewaar deze tekst</button>
     
     <hr>
-    <h2>Bewaarde teksten</h2>
+    <h2>📄 Bewaarde teksten (elke zin op nieuwe regel)</h2>
     <div id="listContainer">Laden...</div>
 
     <script>
-        // Vervang deze gegevens met jouw Supabase URL en anon key
-        const SUPABASE_URL = 'https://dlplfravchetdqmfgqdl.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRscGxmcmF2Y2hldGRxbWZncWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODk2MjcsImV4cCI6MjA5Mjc2NTYyN30.AYREEI81OfBY2IREM6bM1T152Y30Im8s5PXTqCflBws';
+        // ==================== SUPABASE CONFIG (VUL ZELF IN) ====================
+        const SUPABASE_URL = 'https://dlplfravchetdqmfgqdl.supabase.co';    // <-- Vervang
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRscGxmcmF2Y2hldGRxbWZncWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODk2MjcsImV4cCI6MjA5Mjc2NTYyN30.AYREEI81OfBY2IREM6bM1T152Y30Im8s5PXTqCflBws';                // <-- Vervang
+        // ====================================================================
 
-        // Helper om naar Supabase te sturen
+        // Helper: tekst opslaan
         async function saveText(content) {
             if (!content.trim()) return alert('Geen tekst om op te slaan.');
             const response = await fetch(`${SUPABASE_URL}/rest/v1/texts`, {
@@ -44,50 +117,101 @@
                 alert('Opgeslagen!');
                 laadLijst();
             } else {
-                alert('Fout bij opslaan: ' + (await response.text()));
+                const errorText = await response.text();
+                alert('Fout bij opslaan: ' + errorText);
             }
         }
 
-        // Lijst ophalen en tonen
-        async function laadLijst() {
-            const container = document.getElementById('listContainer');
-            container.innerHTML = 'Laden...';
-            const response = await fetch(`${SUPABASE_URL}/rest/v1/texts?select=id,content,created_at&order=created_at.desc`, {
+        // Helper: tekst verwijderen op basis van ID
+        async function deleteText(id) {
+            if (!confirm('Weet je zeker dat je deze tekst wilt verwijderen?')) return;
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/texts?id=eq.${id}`, {
+                method: 'DELETE',
                 headers: {
                     'apikey': SUPABASE_ANON_KEY,
                     'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
                 }
             });
             if (response.ok) {
-                const data = await response.json();
-                if (data.length === 0) {
-                    container.innerHTML = '<p>Nog geen bewaarde tekst.</p>';
-                    return;
-                }
-                container.innerHTML = data.map(item => `
-                    <div class="item">
-                        <div>${escapeHtml(item.content)}</div>
-                        <div class="small">${new Date(item.created_at).toLocaleString()}</div>
-                    </div>
-                `).join('');
+                alert('Verwijderd');
+                laadLijst();
             } else {
-                container.innerHTML = '<p>Fout bij laden.</p>';
+                alert('Verwijderen mislukt');
             }
         }
 
-        // Kleine hulp tegen XSS
+        // Zin-splitsfunctie: houdt leestekens behouden, elke zin op nieuwe regel
+        function splitIntoSentences(text) {
+            // Splits op . ! ? gevolgd door spatie of einde string (of newline)
+            // We gebruiken een lookahead om de scheidingstekens te behouden
+            const sentences = text.match(/[^.!?]+[.!?]+|.+$/g);
+            if (!sentences) return [text];
+            // Trim elke zin en verwijder lege entries
+            return sentences.map(s => s.trim()).filter(s => s.length > 0);
+        }
+
+        // Huidige lijst laden en weergeven (met zinnen per item)
+        async function laadLijst() {
+            const container = document.getElementById('listContainer');
+            container.innerHTML = 'Laden...';
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/texts?select=id,content,created_at&order=created_at.desc`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.length === 0) {
+                        container.innerHTML = '<p>✨ Nog geen bewaarde tekst. Plak of typ iets!</p>';
+                        return;
+                    }
+                    container.innerHTML = data.map(item => {
+                        // Zin voor zin opbreken
+                        const sentences = splitIntoSentences(item.content);
+                        const sentencesHtml = sentences.map(sentence => 
+                            `<span class="sentence-line">• ${escapeHtml(sentence)}</span>`
+                        ).join('');
+                        
+                        return `
+                            <div class="item" data-id="${item.id}">
+                                <button class="delete-btn" data-id="${item.id}">❌</button>
+                                <div class="sentence-container">
+                                    ${sentencesHtml}
+                                </div>
+                                <div class="small">🗓️ ${new Date(item.created_at).toLocaleString()}</div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    // Koppel de delete-knoppen na het renderen
+                    document.querySelectorAll('.delete-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const id = btn.getAttribute('data-id');
+                            deleteText(id);
+                        });
+                    });
+                } else {
+                    container.innerHTML = '<p>❌ Fout bij laden. Controleer Supabase-tabel.</p>';
+                }
+            } catch (err) {
+                container.innerHTML = '<p>⚠️ Netwerkfout: ' + err.message + '</p>';
+            }
+        }
+
+        // Kleine XSS-bescherming
         function escapeHtml(str) {
             return str.replace(/[&<>]/g, function(m) {
                 if (m === '&') return '&amp;';
                 if (m === '<') return '&lt;';
                 if (m === '>') return '&gt;';
                 return m;
-            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-                return c;
             });
         }
 
-        // Klembord lezen (werkt alleen via gebruikersactie, en op HTTPS)
+        // Klembord plakken (alleen via gebruikersactie)
         document.getElementById('pasteBtn').onclick = async () => {
             try {
                 const text = await navigator.clipboard.readText();
@@ -97,17 +221,27 @@
                     alert('Klembord is leeg.');
                 }
             } catch (err) {
-                alert('Kan klembord niet lezen. Geef toestemming (of gebruik handmatig typen).');
+                alert('Kan klembord niet lezen. Geef toestemming of gebruik handmatig typen.');
             }
         };
 
+        // Handmatige tekst opslaan
         document.getElementById('saveManualBtn').onclick = () => {
             const text = document.getElementById('manualText').value;
             saveText(text);
             document.getElementById('manualText').value = '';
         };
 
-        // Start met laden
+        // Als browser Clipboard API niet ondersteunt (bv. sommige mobiele browsers)
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+            document.getElementById('pasteBtn').style.display = 'none';
+            const warning = document.createElement('p');
+            warning.style.color = '#b91c1c';
+            warning.innerText = '⚠️ Je browser ondersteunt geen automatisch plakken. Kopieer tekst en gebruik het tekstveld hierboven.';
+            document.body.insertBefore(warning, document.getElementById('manualText'));
+        }
+
+        // Start lijst laden
         laadLijst();
     </script>
 </body>
