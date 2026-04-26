@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Mijn Klembord Bewaarder</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
+        button, textarea { width: 100%; padding: 0.75rem; margin: 0.5rem 0; font-size: 1rem; }
+        .item { background: #f3f4f6; padding: 0.75rem; margin: 0.5rem 0; border-radius: 8px; word-wrap: break-word; }
+        .small { font-size: 0.8rem; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <h1>📋 Tekst bewaren vanaf klembord</h1>
+    
+    <button id="pasteBtn">📎 Plakken vanaf klembord & bewaren</button>
+    <textarea id="manualText" rows="3" placeholder="Of typ hier tekst..."></textarea>
+    <button id="saveManualBtn">💾 Bewaar deze tekst</button>
+    
+    <hr>
+    <h2>Bewaarde teksten</h2>
+    <div id="listContainer">Laden...</div>
+
+    <script>
+        // Vervang deze gegevens met jouw Supabase URL en anon key
+        const SUPABASE_URL = 'https://jouwproject.supabase.co';
+        const SUPABASE_ANON_KEY = 'jouw-anon-key';
+
+        // Helper om naar Supabase te sturen
+        async function saveText(content) {
+            if (!content.trim()) return alert('Geen tekst om op te slaan.');
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/texts`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify({ content: content.trim() })
+            });
+            if (response.ok) {
+                alert('Opgeslagen!');
+                laadLijst();
+            } else {
+                alert('Fout bij opslaan: ' + (await response.text()));
+            }
+        }
+
+        // Lijst ophalen en tonen
+        async function laadLijst() {
+            const container = document.getElementById('listContainer');
+            container.innerHTML = 'Laden...';
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/texts?select=id,content,created_at&order=created_at.desc`, {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.length === 0) {
+                    container.innerHTML = '<p>Nog geen bewaarde tekst.</p>';
+                    return;
+                }
+                container.innerHTML = data.map(item => `
+                    <div class="item">
+                        <div>${escapeHtml(item.content)}</div>
+                        <div class="small">${new Date(item.created_at).toLocaleString()}</div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p>Fout bij laden.</p>';
+            }
+        }
+
+        // Kleine hulp tegen XSS
+        function escapeHtml(str) {
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+                return c;
+            });
+        }
+
+        // Klembord lezen (werkt alleen via gebruikersactie, en op HTTPS)
+        document.getElementById('pasteBtn').onclick = async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    saveText(text);
+                } else {
+                    alert('Klembord is leeg.');
+                }
+            } catch (err) {
+                alert('Kan klembord niet lezen. Geef toestemming (of gebruik handmatig typen).');
+            }
+        };
+
+        document.getElementById('saveManualBtn').onclick = () => {
+            const text = document.getElementById('manualText').value;
+            saveText(text);
+            document.getElementById('manualText').value = '';
+        };
+
+        // Start met laden
+        laadLijst();
+    </script>
+</body>
+</html>
